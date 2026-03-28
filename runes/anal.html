@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>魔女文字ジェネレータ (Local Font)</title>
+
+  <style>
+    @font-face {
+      font-family: "madoka-runes";
+      src: url("./fonts/runes.ttf") format("truetype");
+    }
+
+    @font-face {
+      font-family: "madoka-majo";
+      src: url("./fonts/MajoPMMM6.ttf") format("truetype");
+    }
+
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --pad: 24;
+      --fontSize: 72;
+      --lineHeight: 1.15;
+      --scale: 1; 
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+      background: #0b0d12;
+      color: #e8ecf3;
+    }
+
+    .wrap {
+      max-width: 1100px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+      /* display: grid; */
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: #121826;
+      border: 1px solid #26304a;
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.35);
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 10px;
+      letter-spacing: .02em;
+    }
+
+    label { display:block; font-size: 12px; color:#b9c4da; margin: 10px 0 6px; }
+    textarea, input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 10px;
+      border: 1px solid #2a3554;
+      background: #0e1422;
+      color: #e8ecf3;
+      padding: 10px 12px;
+      outline: none;
+    }
+    textarea { min-height: 140px; resize: vertical; line-height: 1.35; }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .row3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .ctrl {
+      display:flex; align-items:center; gap:10px;
+    }
+    .ctrl input[type="range"] { width: 100%; }
+
+    .btns {
+      display:flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    button {
+      cursor:pointer;
+      border: 1px solid #2a3554;
+      background: #1a2440;
+      color:#e8ecf3;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(1.1); }
+    button:active { transform: translateY(1px); }
+
+    .previewArea {
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height: 360px;
+      background: #0b1020;
+      border: 1px dashed #2a3554;
+      border-radius: 14px;
+      overflow: hidden;
+      padding: 12px;
+    }
+
+    /* 画面上のプレビュー（DOM） */
+    .previewBox {
+      background: var(--bg);
+      padding: calc(var(--pad) * 1px);
+      border-radius: 12px;
+      transform: scale(var(--scale));
+      transform-origin: center;
+      max-width: 100%;
+    }
+
+    .witchText {
+      font-family: var(--fontFamily), sans-serif;
+      color: var(--fg);
+      font-size: calc(var(--fontSize) * 1px);
+      line-height: var(--lineHeight);
+      white-space: pre-wrap;
+      word-break: break-word;
+      text-align: left;
+      user-select: text;
+    }
+
+    .hint {
+      font-size: 12px;
+      color:#a9b7d6;
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .small { font-size: 12px; color:#b9c4da; }
+    .danger { color:#ffb4b4; }
+    .ok { color:#b6ffbf; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <!-- Left: input & controls -->
+    <div class="card">
+      <h1>リアルタイム魔女文字プレビュー</h1>
+
+      <label>入力（ここに打つ）</label>
+      <textarea id="inputText" placeholder="例：ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 1234567890 / 改行も可能"></textarea>
+
+      <div class="row">
+        <div>
+          <label>フォント選択</label>
+          <select id="fontSelect">
+            <option value="madoka-runes">Runes.ttf</option>
+            <option value="madoka-majo">MajoPMMM6.ttf</option>
+          </select>
+
+          <label>文字色</label>
+          <input id="fgColor" type="color" value="#111111" />
+        </div>
+        <div>
+          <label>背景色</label>
+          <input id="bgColor" type="color" value="#ffffff" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label class="ctrl">
+            <span>背景透過</span>
+            <input id="bgTransparent" type="checkbox" />
+          </label>
+          <div class="small">PNG透過に反映（SVGも透過可）</div>
+        </div>
+        <div>
+          <label>書き出し形式</label>
+          <select id="exportType" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #2a3554; background:#0e1422; color:#e8ecf3;">
+            <option value="png">PNG</option>
+            <option value="svg">SVG</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>フォントサイズ</label>
+          <div class="ctrl">
+            <input id="fontSize" type="range" min="16" max="220" value="72" />
+            <span id="fontSizeVal" class="small">72px</span>
+          </div>
+        </div>
+        <div>
+          <label>余白（padding）</label>
+          <div class="ctrl">
+            <input id="padding" type="range" min="0" max="120" value="24" />
+            <span id="paddingVal" class="small">24px</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>行間</label>
+          <div class="ctrl">
+            <input id="lineHeight" type="range" min="80" max="200" value="115" />
+            <span id="lineHeightVal" class="small">1.15</span>
+          </div>
+        </div>
+        <div>
+          <label>出力倍率（PNGのみ）</label>
+          <div class="ctrl">
+            <input id="pngScale" type="range" min="1" max="6" value="2" />
+            <span id="pngScaleVal" class="small">2x</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label>プレビュー縮尺</label>
+          <div class="ctrl">
+            <input id="previewScale" type="range" min="50" max="150" value="100" />
+            <span id="previewScaleVal" class="small">100%</span>
+          </div>
+        </div>
+        <div>
+          <label>整列</label>
+          <select id="textAlign" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #2a3554; background:#0e1422; color:#e8ecf3;">
+            <option value="left">左</option>
+            <option value="center">中央</option>
+            <option value="right">右</option>
+          </select>
+        </div>
+        <div>
+          <label>ファイル名</label>
+          <input id="fileName" type="text" value="witch_text" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button id="btnExport">画像に変換して保存</button>
+        <button id="btnCopySvg" title="SVG選択時に有効">SVGをクリップボード用にコピー</button>
+        <button id="btnClear">クリア</button>
+      </div>
+
+      <div id="status" class="hint"></div>
+      <div class="hint">
+        <div>・入力→右側がリアルタイムにフォント適用表示。</div>
+        <div>・「画像に変換して保存」はボタン時のみ（要件どおり）。</div>
+        <div>・フォントが読めてない時は <span class="danger">fonts のパス</span> or <span class="danger">format(truetype)</span> を確認。</div>
+      </div>
+    </div>
+
+    <!-- Right: preview -->
+    <div class="card">
+      <h1>プレビュー</h1>
+      <div class="previewArea">
+        <div id="previewBox" class="previewBox">
+          <div id="previewText" class="witchText"></div>
+        </div>
+      </div>
+      <div class="hint" id="fontCheck"></div>
+
+      <!-- hidden canvas for PNG export -->
+      <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const inputText = $("inputText");
+  const previewText = $("previewText");
+  const previewBox = $("previewBox");
+
+  const fgColor = $("fgColor");
+  const bgColor = $("bgColor");
+  const bgTransparent = $("bgTransparent");
+  const exportType = $("exportType");
+
+  const fontSize = $("fontSize");
+  const padding = $("padding");
+  const lineHeight = $("lineHeight");
+  const pngScale = $("pngScale");
+  const previewScale = $("previewScale");
+  const textAlign = $("textAlign");
+  const fileName = $("fileName");
+  const fontSelect = $("fontSelect");
+
+  const fontSizeVal = $("fontSizeVal");
+  const paddingVal = $("paddingVal");
+  const lineHeightVal = $("lineHeightVal");
+  const pngScaleVal = $("pngScaleVal");
+  const previewScaleVal = $("previewScaleVal");
+
+  const status = $("status");
+  const fontCheck = $("fontCheck");
+
+  const canvas = $("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function setRootVar(name, value) {
+    document.documentElement.style.setProperty(name, value);
+  }
+
+  function updatePreview() {
+    const text = inputText.value ?? "";
+    previewText.textContent = text;
+
+    // CSS変数反映
+    setRootVar("--fontFamily", fontSelect.value);
+    setRootVar("--fg", fgColor.value);
+    setRootVar("--bg", bgTransparent.checked ? "transparent" : bgColor.value);
+    setRootVar("--pad", String(padding.value));
+    setRootVar("--fontSize", String(fontSize.value));
+    setRootVar("--lineHeight", String((lineHeight.value / 100).toFixed(2)));
+    setRootVar("--scale", String((previewScale.value / 100).toFixed(2)));
+
+    previewText.style.textAlign = textAlign.value;
+
+    // 表示値
+    fontSizeVal.textContent = `${fontSize.value}px`;
+    paddingVal.textContent = `${padding.value}px`;
+    lineHeightVal.textContent = `${(lineHeight.value / 100).toFixed(2)}`;
+    pngScaleVal.textContent = `${pngScale.value}x`;
+    previewScaleVal.textContent = `${previewScale.value}%`;
+
+    status.innerHTML = "";
+  }
+
+  // フォントロード確認（可能な範囲で）
+  async function checkFontLoaded() {
+    // document.fonts.check は読み込み判定に使える
+    const size = Math.max(24, Number(fontSize.value || 72));
+    const ok = document.fonts && document.fonts.check(`${size}px "madokarunes"`);
+    fontCheck.innerHTML = ok
+      ? `<span class="ok">madokarunes フォントを認識しました。</span>`
+      : `<span class="danger">フォントが未認識かも。</span> fonts/ のパスと @font-face を確認してね。`;
+  }
+
+  // Canvasでの文字サイズ計測（改行対応）
+  function measureMultiline(ctx, lines, font, linePx) {
+    ctx.font = font;
+    let maxW = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > maxW) maxW = w;
+    }
+    const h = lines.length * linePx;
+    return { width: Math.ceil(maxW), height: Math.ceil(h) };
+  }
+
+  function downloadBlob(blob, name) {
+    const a = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+async function exportPNG() {
+  const text = inputText.value ?? "";
+  if (!text.trim()) {
+    status.innerHTML = `<span class="danger">テキストが空です。</span>`;
+    return;
+  }
+
+  const family = fontSelect.value;           // ★追加
+  const scale = Number(pngScale.value || 2);
+  const pad = Number(padding.value || 24);
+  const size = Number(fontSize.value || 72);
+  const lh = Number(lineHeight.value || 115) / 100;
+  const linePx = size * lh;
+
+  // ★追加：フォントを確実にロード
+  if (document.fonts?.load) {
+    await document.fonts.load(`${size}px "${family}"`);
+    await document.fonts.ready;
+  }
+
+  const font = `${size}px "${family}"`;      // ★修正
+
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+
+  ctx.setTransform(1,0,0,1,0,0);
+  const m = measureMultiline(ctx, lines, font, linePx);
+
+  const w = (m.width + pad * 2);
+  const h = (m.height + pad * 2);
+
+  canvas.width = Math.ceil(w * scale);
+  canvas.height = Math.ceil(h * scale);
+
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+  if (!bgTransparent.checked) {
+    ctx.fillStyle = bgColor.value;
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.clearRect(0, 0, w, h);
+  }
+
+  ctx.fillStyle = fgColor.value;
+  ctx.font = font;
+  ctx.textBaseline = "top";
+
+  const align = textAlign.value;
+  ctx.textAlign = align;
+
+  let x;
+  if (align === "left") x = pad;
+  else if (align === "center") x = w / 2;
+  else x = w - pad;
+
+  let y = pad;
+  for (const line of lines) {
+    ctx.fillText(line, x, y);
+    y += linePx;
+  }
+
+  const outName = (fileName.value || "witch_text").replace(/[\\\/:*?"<>|]/g, "_") + ".png";
+
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      status.innerHTML = `<span class="danger">PNG生成に失敗。</span>`;
+      return;
+    }
+    downloadBlob(blob, outName);
+    status.innerHTML = `PNGを書き出しました：<b>${outName}</b>`;
+  }, "image/png");
+}
+
+  function escapeXml(s) {
+    return s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
+
+async function exportSVG({ copyToClipboard = false } = {}) {
+  const text = inputText.value ?? "";
+  if (!text.trim()) {
+    status.innerHTML = `<span class="danger">テキストが空です。</span>`;
+    return;
+  }
+
+  const family = fontSelect.value; // ★追加
+
+  const pad = Number(padding.value || 24);
+  const size = Number(fontSize.value || 72);
+  const lh = Number(lineHeight.value || 115) / 100;
+  const linePx = size * lh;
+  const align = textAlign.value;
+
+  const font = `${size}px "${family}"`; // ★修正
+
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  ctx.font = font;
+  const m = measureMultiline(ctx, lines, font, linePx);
+  const w = (m.width + pad * 2);
+  const h = (m.height + pad * 2);
+
+  const bg = bgTransparent.checked ? "none" : bgColor.value;
+  const fill = fgColor.value;
+
+  let x, anchor;
+  if (align === "left") { x = pad; anchor = "start"; }
+  else if (align === "center") { x = w/2; anchor = "middle"; }
+  else { x = w - pad; anchor = "end"; }
+
+  const tspans = lines.map((line, i) => {
+    const dy = (i === 0) ? 0 : linePx;
+    return `<tspan x="${x}" dy="${dy}">${escapeXml(line)}</tspan>`;
+  }).join("");
+
+  const svg =
+`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect width="100%" height="100%" fill="${bg}" />
+  <text x="${x}" y="${pad}" fill="${fill}"
+        font-family="${family}"  <!-- ★修正 -->
+        font-size="${size}"
+        dominant-baseline="hanging"
+        text-anchor="${anchor}">
+    ${tspans}
+  </text>
+</svg>`;
+
+  const outName = (fileName.value || "witch_text").replace(/[\\\/:*?"<>|]/g, "_") + ".svg";
+
+  if (copyToClipboard) {
+    try {
+      await navigator.clipboard.writeText(svg);
+      status.innerHTML = `SVGをクリップボードにコピーしました。`;
+    } catch (e) {
+      status.innerHTML = `<span class="danger">クリップボードにコピーできませんでした。</span>`;
+    }
+    return;
+  }
+
+  downloadBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), outName);
+  status.innerHTML = `SVGを書き出しました：<b>${outName}</b>`;
+}
+
+  async function exportImage() {
+    updatePreview();
+    await checkFontLoaded();
+
+    const type = exportType.value;
+    if (type === "png") return exportPNG();
+    return exportSVG();
+  }
+
+  // イベント
+  ["input", "change"].forEach(ev => {
+    inputText.addEventListener(ev, updatePreview);
+    fgColor.addEventListener(ev, updatePreview);
+    bgColor.addEventListener(ev, updatePreview);
+    bgTransparent.addEventListener(ev, updatePreview);
+    fontSize.addEventListener(ev, updatePreview);
+    padding.addEventListener(ev, updatePreview);
+    lineHeight.addEventListener(ev, updatePreview);
+    pngScale.addEventListener(ev, updatePreview);
+    previewScale.addEventListener(ev, updatePreview);
+    textAlign.addEventListener(ev, updatePreview);
+    exportType.addEventListener(ev, updatePreview);
+    fileName.addEventListener(ev, updatePreview);
+      fontSelect.addEventListener(ev, updatePreview);
+  });
+
+
+  $("btnExport").addEventListener("click", exportImage);
+
+  $("btnCopySvg").addEventListener("click", async () => {
+    if (exportType.value !== "svg") {
+      status.innerHTML = `SVGにしてから押してね（今は ${exportType.value.toUpperCase()}）。`;
+      return;
+    }
+    await exportSVG({ copyToClipboard: true });
+  });
+
+  $("btnClear").addEventListener("click", () => {
+    inputText.value = "";
+    updatePreview();
+  });
+
+  // 初期化
+  updatePreview();
+  // ちょい待ってフォント確認
+  setTimeout(checkFontLoaded, 200);
+</script>
+</body>
+</html>
